@@ -14,7 +14,7 @@ def init_db():
 
 def apply_sql_scrips():
     with engine.connect() as connection:
-        scripts = ["01_before_transaction.sql", "02_after_transaction.sql"]
+        scripts = ["01_before_transaction.sql", "02_after_transaction.sql", "03_create_views.sql"]
         
         for script_name in scripts:
             filepath = os.path.join("sql_scripts", script_name)
