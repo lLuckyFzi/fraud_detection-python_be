@@ -44,74 +44,79 @@ def seed_data():
         for m in merchants_normal: db.refresh(m)
         db.refresh(merchant_london)
 
+        all_transactions = []
         date_now = datetime.now(timezone.utc)
-        normal_transactions = []
-        
-        for i in range(50):
-            random_days_ago = random.randint(1, 30)
-            random_hours_ago = random.randint(1, 23)
-            tx_time = date_now - timedelta(days=random_days_ago, hours=random_hours_ago)
+
+        for i in range(200):
+            rand_val = random.random()
+            tx_time = date_now - timedelta(hours=random.randint(1, 720)) # 30 days range
             
-            random_amount = float(random.randint(15, 300) * 1000)
-            random_merchant = random.choice(merchants_normal)
+            if rand_val < 0.80:
+                # SCENARIO 1 (80%) Normal Transaction
+                amount = float(random.randint(15, 500) * 1000)
+                status = TransactionStatus.Success
+                merchant = random.choice(merchants_normal)
+                
+                # Probabilitas Saluran: 90% Mobile, 10% Web Portal
+                channel = "Mobile_Banking" if random.random() < 0.90 else "Web_Portal"
+                
+                ip = "114.120.10.5" # IP konsisten
+                lat, lon = -6.9147, 107.6098
+                
+            elif rand_val < 0.90:
+                # SCENARIO 2 (10% - Edge Case) High-Value Local Transaction
+                amount = float(random.randint(10000, 30000) * 1000)
+                status = TransactionStatus.Success
+                merchant = random.choice(merchants_normal) 
+                
+                # propability 70% Mobile Banking, 30% Web Portal
+                channel = "Mobile_Banking" if random.random() < 0.70 else "Web_Portal"
+                
+                ip = "114.120.10.5"
+                lat, lon = -6.9147, 107.6098
+                
+            elif rand_val < 0.98:
+                # SCENARIO 3 8% Fraud Tipikal
+                amount = float(random.randint(5000, 50000) * 1000)
+                status = TransactionStatus.Blocked
+                
+                # Probabilitas location 80% abroad, 20% hacker using local VPN
+                if random.random() < 0.80:
+                    merchant = merchant_london
+                    ip = fake.ipv4()
+                    lat, lon = 51.5074, -0.1278
+                else:
+                    merchant = random.choice(merchants_normal)
+                    ip = fake.ipv4() # IP tetap aneh/acak meski lokasinya Bandung
+                    lat, lon = -6.9147, 107.6098
+                
+                # propability 80% Web Portal, 20% Mobile Banking
+                channel = "Web_Portal" if random.random() < 0.80 else "Mobile_Banking"
+                
+            else:
+                # SCENARIO 4 (2% - Edge Case): Fraud Card Testing
+                amount = float(random.randint(5, 50) * 1000)
+                status = TransactionStatus.Blocked
+                merchant = merchant_london
+                ip = fake.ipv4()
+                lat, lon = 51.5074, -0.1278
+                channel = "Web_Portal" if random.random() < 0.90 else "Mobile_Banking"
 
             tx = Transaction(
                 account_id=account_example.account_id,
-                merchant_id=random_merchant.merchant_id,
-                amount=random_amount,
+                merchant_id=merchant.merchant_id,
+                amount=amount,
                 transaction_type=TransactionType.Online_Purchase,
-                channel="Mobile_Banking", ip_address=fake.ipv4(),
-                device_fingerprint="HASH_IPHONE_BUDI_123",
-                latitude=float(fake.coordinate(center=-6.9147, radius=0.1)),
-                longitude=float(fake.coordinate(center=107.6098, radius=0.1)),
-                status=TransactionStatus.Success,
+                channel=channel,
+                ip_address=ip,
+                device_fingerprint=f"HASH_DEV_{'BUDI' if status == TransactionStatus.Success else 'HACKER_'+str(i)}",
+                latitude=lat, longitude=lon,
+                status=status,
                 timestamp=tx_time
             )
-            normal_transactions.append(tx)
-            
-        db.add_all(normal_transactions)
-        db.commit()
+            all_transactions.append(tx)
 
-        tx_bandung = Transaction(
-            account_id=account_example.account_id, merchant_id=merchants_normal[0].merchant_id,
-            amount=45000.00, transaction_type=TransactionType.Online_Purchase, channel="Mobile_Banking", 
-            ip_address="114.120.10.5", device_fingerprint="HASH_IPHONE_BUDI_123",
-            latitude=-6.9147, longitude=107.6098, status=TransactionStatus.Success,
-            timestamp=date_now - timedelta(minutes=15)
-        )
-        tx_london = Transaction(
-            account_id=account_example.account_id, merchant_id=merchant_london.merchant_id,
-            amount=25000000.00, transaction_type=TransactionType.Online_Purchase, channel="Web_Portal", 
-            ip_address="82.163.20.1", device_fingerprint="HASH_UNKNOWN_PC_999",
-            latitude=51.5074, longitude=-0.1278, status=TransactionStatus.Success, 
-            timestamp=date_now - timedelta(minutes=5)
-        )
-
-        db.add_all([tx_bandung, tx_london])
-        db.commit()
-
-        fraud_txs = []
-        for i in range(15):
-            random_hours_ago = random.randint(1, 72)
-            tx_time = date_now - timedelta(hours=random_hours_ago)
-            
-            fraud_amount = float(random.randint(15000, 50000) * 1000)
-            
-            tx = Transaction(
-                account_id=account_example.account_id,
-                merchant_id=merchant_london.merchant_id, 
-                amount=fraud_amount, 
-                transaction_type=TransactionType.Online_Purchase,
-                channel="Web_Portal", 
-                ip_address=fake.ipv4(),
-                device_fingerprint=f"HASH_HACKER_DEVICE_{i}",
-                latitude=51.5074, longitude=-0.1278,
-                status=TransactionStatus.Blocked, 
-                timestamp=tx_time
-            )
-            fraud_txs.append(tx)
-            
-        db.add_all(fraud_txs)
+        db.add_all(all_transactions)
         db.commit()
         
     except Exception as e:

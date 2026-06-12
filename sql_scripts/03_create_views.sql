@@ -1,17 +1,25 @@
 CREATE OR REPLACE VIEW v_ml_user_features AS
 SELECT 
-    t.account_id,
-    AVG(CASE WHEN t.timestamp >= NOW() - INTERVAL 30 DAY THEN t.amount ELSE 0 END) AS avg_amount_30d,
+    t1.transaction_id,
+    t1.account_id,
     
-    SUM(CASE WHEN t.timestamp >= NOW() - INTERVAL 24 HOUR THEN 1 ELSE 0 END) AS tx_count_24h,
-    
-    SUM(CASE WHEN t.status IN ('Failed', 'Blocked') AND t.timestamp >= NOW() - INTERVAL 24 HOUR THEN 1 ELSE 0 END) AS failed_tx_count_24h,
-    
-    (SELECT m.country_code 
-     FROM transactions tr 
-     JOIN merchants m ON tr.merchant_id = m.merchant_id 
-     WHERE tr.account_id = t.account_id 
-     ORDER BY tr.timestamp DESC LIMIT 1) AS last_known_country
+    COALESCE((SELECT AVG(t2.amount) 
+     FROM transactions t2 
+     WHERE t2.account_id = t1.account_id 
+       AND t2.timestamp <= t1.timestamp 
+       AND t2.timestamp >= t1.timestamp - INTERVAL 30 DAY), 0) AS avg_amount_30d,
+       
+    COALESCE((SELECT COUNT(t2.transaction_id) 
+     FROM transactions t2 
+     WHERE t2.account_id = t1.account_id 
+       AND t2.timestamp <= t1.timestamp 
+       AND t2.timestamp >= t1.timestamp - INTERVAL 24 HOUR), 0) AS tx_count_24h,
+       
+    COALESCE((SELECT COUNT(t2.transaction_id) 
+     FROM transactions t2 
+     WHERE t2.account_id = t1.account_id 
+       AND t2.status IN ('Failed', 'Blocked')
+       AND t2.timestamp <= t1.timestamp 
+       AND t2.timestamp >= t1.timestamp - INTERVAL 24 HOUR), 0) AS failed_tx_count_24h
 
-FROM transactions t
-GROUP BY t.account_id;
+FROM transactions t1;
