@@ -17,7 +17,6 @@
 # Database Python Configurations
 Database Local URL: `mysql+pymysql://<DATABSE_USERNAME>:<DATABSE_PASSWORD>@localhost:3306/<DATABSE_NAME>`
 
-
 **please add this in .gitigore pyhon manual project**
 .env
 venv/
